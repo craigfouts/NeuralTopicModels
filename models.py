@@ -165,8 +165,10 @@ class VAETM(nn.Module):
         super().__init__()
         self.n_topics = n_topics
         self.n_words = n_words
+        self.vocab_size = vocab_size
         self.encoder = VAETMEncoder(vocab_size, hidden_dim, n_topics)
         self.decoder = VAETMDecoder(n_topics, hidden_dim, vocab_size)
+        self.X_ = None
         self.loss_log_ = []
 
     def _model(self, x):
@@ -185,18 +187,19 @@ class VAETM(nn.Module):
             pyro.sample('latent', dist.Normal(z_loc, z_scale).to_event(1))
 
     def fit(self, X, n_steps=100, learning_rate=1e-2):
+        _, self.X_ = build(X, self.n_words, self.vocab_size, return_counts=True)
         optim = Adam({'lr': learning_rate})
         elbo = TraceMeanField_ELBO()
         svi = SVI(self._model, self._guide, optim, elbo)
         for _ in tqdm(range(n_steps)):
-            loss = svi.step(X)
+            loss = svi.step(self.X_)
             self.loss_log_.append(loss)
         return self
     
-    def transform(self, X):
-        dists_loc, dists_scale = self.encoder(X)
+    def transform(self, _=None):
+        dists_loc, dists_scale = self.encoder(self.X_)
         dists = dist.Normal(dists_loc, dists_scale).sample()
-        return dists
+        return dists.detach()
     
 # Product of Experts VAE Topic Model
 
@@ -232,8 +235,10 @@ class PVAETM(nn.Module):
         super().__init__()
         self.n_topics = n_topics
         self.n_words = n_words
+        self.vocab_size = vocab_size
         self.encoder = VAETMEncoder(vocab_size, hidden_dim, n_topics)
         self.decoder = VAETMDecoder(n_topics, hidden_dim, vocab_size)
+        self.X_ = None
         self.loss_log_ = []
 
     def _model(self, x):
@@ -252,18 +257,19 @@ class PVAETM(nn.Module):
             pyro.sample('latent', dist.Normal(z_loc, z_scale).to_event(1))
 
     def fit(self, X, n_steps=100, learning_rate=1e-2):
+        _, self.X_ = build(X, self.n_words, self.vocab_size, return_counts=True)
         optim = Adam({'lr': learning_rate})
         elbo = TraceMeanField_ELBO()
         svi = SVI(self._model, self._guide, optim, elbo)
         for _ in tqdm(range(n_steps)):
-            loss = svi.step(X)
+            loss = svi.step(self.X_)
             self.loss_log_.append(loss)
         return self
     
-    def transform(self, X):
-        dists_loc, dists_scale = self.encoder(X)
+    def transform(self, _=None):
+        dists_loc, dists_scale = self.encoder(self.X_)
         dists = dist.Normal(dists_loc, dists_scale).sample()
-        return dists
+        return dists.detach()
     
 # Basic Neural Topic Model
 
@@ -299,8 +305,10 @@ class NTM(nn.Module):
         super().__init__()
         self.n_topics = n_topics
         self.n_words = n_words
+        self.vocab_size = vocab_size
         self.encoder = NTMEncoder(vocab_size, hidden_dim, n_topics)
         self.decoder = NTMDecoder(n_topics, vocab_size)
+        self.X_ = None
         self.loss_log_ = []
 
     def _model(self, x):
@@ -319,17 +327,18 @@ class NTM(nn.Module):
             pyro.sample('latent', dist.Normal(z_loc, z_scale).to_event(1))
 
     def fit(self, X, n_steps=100, learning_rate=1e-2):
+        _, self.X_ = build(X, self.n_words, self.vocab_size, return_counts=True)
         optim = Adam({'lr': learning_rate})
         elbo = TraceMeanField_ELBO()
         svi = SVI(self._model, self._guide, optim, elbo)
         for _ in tqdm(range(n_steps)):
-            loss = svi.step(X)
+            loss = svi.step(self.X_)
             self.loss_log_.append(loss)
         return self
     
-    def transform(self, X):
-        dists = X@self.decoder.net[0].weight
-        return dists
+    def transform(self, _=None):
+        dists = self.X_@self.decoder.net[0].weight
+        return dists.detach()
     
 # Product of Experts Neural Topic Model
 
@@ -365,8 +374,10 @@ class PNTM(nn.Module):
         super().__init__()
         self.n_topics = n_topics
         self.n_words = n_words
+        self.vocab_size = vocab_size
         self.encoder = PNTMEncoder(vocab_size, hidden_dim, n_topics)
         self.decoder = PNTMDecoder(n_topics, vocab_size)
+        self.X_ = None
         self.loss_log_ = []
 
     def _model(self, x):
@@ -385,17 +396,18 @@ class PNTM(nn.Module):
             pyro.sample('latent', dist.Normal(z_loc, z_scale).to_event(1))
 
     def fit(self, X, n_steps=100, learning_rate=1e-2):
+        _, self.X_ = build(X, self.n_words, self.vocab_size, return_counts=True)
         optim = Adam({'lr': learning_rate})
         elbo = TraceMeanField_ELBO()
         svi = SVI(self._model, self._guide, optim, elbo)
         for _ in tqdm(range(n_steps)):
-            loss = svi.step(X)
+            loss = svi.step(self.X_)
             self.loss_log_.append(loss)
         return self
     
-    def transform(self, X):
-        dists = X@self.decoder.net[0].weight
-        return dists
+    def transform(self, _=None):
+        dists = self.X_@self.decoder.net[0].weight
+        return dists.detach()
     
 # Gaussian Softmax Neural Topic Model
 
@@ -431,8 +443,10 @@ class GNTM(nn.Module):
         super().__init__()
         self.n_topics = n_topics
         self.n_words = n_words
+        self.vocab_size = vocab_size
         self.encoder = GNTMEncoder(vocab_size, hidden_dim, n_topics)
         self.decoder = GNTMDecoder(n_topics, vocab_size)
+        self.X_ = None
         self.loss_log_ = []
 
     def _model(self, x):
@@ -451,17 +465,18 @@ class GNTM(nn.Module):
             pyro.sample('latent', GaussianSoftmax(z_loc, z_scale).to_event(1))
 
     def fit(self, X, n_steps=100, learning_rate=1e-2):
+        _, self.X_ = build(X, self.n_words, self.vocab_size, return_counts=True)
         optim = Adam({'lr': learning_rate})
         elbo = TraceMeanField_ELBO()
         svi = SVI(self._model, self._guide, optim, elbo)
         for _ in tqdm(range(n_steps)):
-            loss = svi.step(X)
+            loss = svi.step(self.X_)
             self.loss_log_.append(loss)
         return self
     
-    def transform(self, X):
-        dists = X@self.decoder.net[0].weight
-        return dists
+    def transform(self, _=None):
+        dists = self.X_@self.decoder.net[0].weight
+        return dists.detach()
     
 # Product of Experts Gaussian Softmax Neural Topic Model
 
@@ -497,8 +512,10 @@ class PGNTM(nn.Module):
         super().__init__()
         self.n_topics = n_topics
         self.n_words = n_words
+        self.vocab_size = None
         self.encoder = PGNTMEncoder(vocab_size, hidden_dim, n_topics)
         self.decoder = PGNTMDecoder(n_topics, vocab_size)
+        self.X_ = None
         self.loss_log_ = []
 
     def _model(self, x):
@@ -517,21 +534,22 @@ class PGNTM(nn.Module):
             pyro.sample('latent', GaussianSoftmax(z_loc, z_scale).to_event(1))
 
     def fit(self, X, n_steps=100, learning_rate=1e-2):
+        _, self.X_ = build(X, self.n_words, self.vocab_size, return_counts=True)
         optim = Adam({'lr': learning_rate})
         elbo = TraceMeanField_ELBO()
         svi = SVI(self._model, self._guide, optim, elbo)
         for _ in tqdm(range(n_steps)):
-            loss = svi.step(X)
+            loss = svi.step(self.X_)
             self.loss_log_.append(loss)
         return self
     
-    def transform(self, X):
-        dists = X@self.decoder.net[0].weight
-        return dists
+    def transform(self, _=None):
+        dists = self.X_@self.decoder.net[0].weight
+        return dists.detach()
     
 # Gaussian Prior Product of Experts Neural Topic Model
 
-class PPGSTMEncoder(nn.Module):
+class GPNTMEncoder(nn.Module):
     def __init__(self, input_dim, hidden_dim, latent_dim):
         super().__init__()
         encoding_layers = (input_dim, hidden_dim, hidden_dim)
@@ -546,7 +564,7 @@ class PPGSTMEncoder(nn.Module):
         z_scale = (.5*self.scale_net(y)).exp()
         return z_loc, z_scale
 
-class PPGSTMDecoder(nn.Module):
+class GPNTMDecoder(nn.Module):
     def __init__(self, latent_dim, output_dim):
         super().__init__()
         layers = (latent_dim, output_dim)
@@ -558,17 +576,17 @@ class PPGSTMDecoder(nn.Module):
         x = self.net(y)
         return x
     
-class PPGSTM(nn.Module):
+class GPNTM(nn.Module):
     def __init__(self, n_topics, n_words, vocab_size, hidden_dim, scale=.1):
         super().__init__()
         self.n_topics = n_topics
         self.n_words = n_words
         self.vocab_size = vocab_size
         self.scale = scale
-        self.encoder = PPGSTMEncoder(vocab_size, hidden_dim, n_topics)
-        self.decoder = PPGSTMDecoder(n_topics, vocab_size)
+        self.encoder = GPNTMEncoder(vocab_size, hidden_dim, n_topics)
+        self.decoder = GPNTMDecoder(n_topics, vocab_size)
         self.X_ = None
-        self.library_ = None
+        self.X_locs_ = None
         self.process_log_ = []
         self.loss_log_ = []
 
@@ -582,9 +600,9 @@ class PPGSTM(nn.Module):
         process.autoguide('X', dist.Normal)
         self.process_log_ = gp.util.train(process, num_steps=gp_steps)
         process.mode = 'guide'
-        self.X_ = process.X_loc
-        _, self.library_ = build(self.X_.detach(), self.n_words, self.vocab_size, return_counts=True)
-        return self.X_, self.library_
+        self.X_locs_ = process.X_loc
+        _, self.X_ = build(self.X_locs_.detach(), self.n_words, self.vocab_size, return_counts=True)
+        return self.X_, self.X_locs_
 
     def _model(self, x):
         pyro.module('decoder', self.decoder)
@@ -602,15 +620,16 @@ class PPGSTM(nn.Module):
             pyro.sample('latent', dist.Normal(z_loc, z_scale).to_event(1))
 
     def fit(self, X, n_steps=100, learning_rate=1e-2, gp_steps=1000):
-        self._process(X, gp_steps)
+        Y = torch.tensor(X, dtype=torch.float32)
+        self._process(Y, gp_steps)
         optim = Adam({'lr': learning_rate})
         elbo = TraceMeanField_ELBO()
         svi = SVI(self._model, self._guide, optim, elbo)
         for _ in tqdm(range(n_steps)):
-            loss = svi.step(self.library_)
+            loss = svi.step(self.X_)
             self.loss_log_.append(loss)
         return self
     
     def transform(self, _=None):
-        dists = self.library_@self.decoder.net[0].weight
-        return dists
+        dists = self.X_@self.decoder.net[0].weight
+        return dists.detach()
