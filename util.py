@@ -4,7 +4,9 @@ import numpy as np
 import os
 import random
 import torch
+from sklearn.metrics import confusion_matrix
 from sklearn.neighbors import NearestNeighbors
+from scipy.optimize import linear_sum_assignment
 
 def set_seed(seed=9):  
     random.seed(seed)
@@ -13,6 +15,19 @@ def set_seed(seed=9):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
     os.environ['PYTHONHASHSEED'] = str(seed)
+
+def map_labels(X_labels, Y_labels):
+    scores = confusion_matrix(Y_labels, X_labels)
+    row, col = linear_sum_assignment(scores, maximize=True)
+    labels = np.zeros_like(X_labels)
+    for i in row:
+        labels[Y_labels == i] = col[i]
+    return labels
+
+def evaluate(X_labels, Y_labels):
+    Y_labels = map_labels(X_labels, Y_labels)
+    score = (X_labels == Y_labels).sum()/X_labels.shape[0]
+    return Y_labels, score
 
 def remove_lonely(data, labels, threshold=225., n_neighbors=12):
     locs = data[:, :2]
@@ -52,3 +67,8 @@ def visualize_dataset(X, X_labels, size=32, show_ax=True, filename=None, colorma
     ax.scatter(X[:, 0], X[:, 1], s=size, c=X_labels, cmap=colormap)
     if filename is not None:
         fig.savefig(filename, bbox_inches='tight')
+
+def visualize_log(log):
+    x = np.arange(len(log))
+    plt.plot(x, log)
+    plt.show()
