@@ -4,9 +4,12 @@ import numpy as np
 import os
 import random
 import torch
+from scipy import ndimage
+from scipy.optimize import linear_sum_assignment
 from sklearn.metrics import confusion_matrix
 from sklearn.neighbors import NearestNeighbors
-from scipy.optimize import linear_sum_assignment
+from skimage import io
+from skimage.segmentation import watershed
 
 def set_seed(seed=9):  
     random.seed(seed)
@@ -48,6 +51,20 @@ def read_spine_data(filename, threshold=225., n_neighbors=12, feature_key='prote
     if threshold is not None:
         data, labels = remove_lonely(data, labels, threshold, n_neighbors)
     return data, labels
+
+def process_spine():
+    X, X_labels = read_spine_data('data/m387ntga2.h5mu')
+    img = io.imread('data/m387ntga2.tiff').astype(np.int32)
+    distance = ndimage.distance_transform_edt(img)
+    labels = watershed(-distance, 2, mask=img)
+    X_labels = np.zeros_like(X_labels)
+    for i in range(X_labels.shape[0]):
+        x, y = int(X[i, 0]), int(X[i, 1])
+        if labels[x, y] > 0:
+            X_labels[i] = img[x, y]
+    X = np.delete(X, np.where(X_labels == 0), 0)
+    X_labels = np.delete(X_labels, np.where(X_labels == 0), 0)
+    return X, X_labels
 
 def read_anndata(filename, id_key='leiden', spatial_key='spatial', threshold=225., n_neighbors=12):
     mdata = mu.read(filename)
