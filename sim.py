@@ -49,13 +49,15 @@ def generate_from_array(n_cells, mean_arr, variances):
         cell_count += cells_in_class
     return data, labels
 
-def generate_data(n_genes, n_informative, n_cells=900, n_topics=2, means=None, variances=None):
+def generate_data(n_genes, n_informative, n_cells=900, n_topics=2, means=None, variances=None, return_means=False):
     if means is None:
         means, variances = generate_means(n_genes, n_informative, n_topics)
     if isinstance(n_cells, np.ndarray):
         data, labels = generate_from_array(n_cells, means, variances)
     else:
         data, labels = generate_from_array(np.repeat(n_cells, n_topics), means, variances)
+    if return_means:
+        return data, labels, means, variances
     return data, labels
 
 def scale(X, min_, max_, mirror=False):
@@ -139,7 +141,7 @@ def generate_blocks(n_genes, n_informative, n_topics=2, n_cells=1, mixed=False, 
         assert means.shape == (len(blocks), n_genes), "Expected argument 'means' of shape (n_topics, n_genes)."
         assert variances.shape == (n_genes,), "Expected argument 'variances' of shape (n_genes,)"
     cells_per_class = cells_per_block(blocks)
-    X, X_labels = generate_data(n_genes, n_informative, cells_per_class, len(blocks), means, variances)
+    X, X_labels, means, variances = generate_data(n_genes, n_informative, cells_per_class, len(blocks), means, variances, return_means=True)
     idx = np.zeros(len(cells_per_class), dtype=np.int32)
     for i in range(1, idx.shape[0]):
         idx[i] = idx[i - 1] + cells_per_class[i - 1]
@@ -153,6 +155,7 @@ def generate_blocks(n_genes, n_informative, n_topics=2, n_cells=1, mixed=False, 
                 X[idx[i], 1] = p[1]
                 if mixed and any(np.array_equal(m, p) for m in M):
                     M_labels[idx[i]] = (i + np.random.randint(1, len(blocks))) % len(blocks)
+                    X[idx[i], 2:] = np.random.normal(means[M_labels[idx[i]], 2:], variances[2:], n_genes - 2)
                 idx[i] += 1
     if mixed:  
         return X, X_labels, M_labels
